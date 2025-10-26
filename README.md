@@ -1,7 +1,7 @@
 # GIMBAL: Growth Index Modeling with Background as LambdaCDM
 
 This library has an Object-Oriented modeling of the Friedmann equation with a flat
-Friedmann-Lemaitre-Robertson-Walker metric as used in the paper [...]. The current version counts only with a LCDM
+Friedmann-Lemaitre-Robertson-Walker metric as used in the paper [arXiv:2510.15054](https://arxiv.org/abs/2510.15054). The current version counts only with a LCDM
 background, but in the future we will publish more cosmological backgrounds.
 
 The library has an implementation of two collapse models with the LCDM background, both with
