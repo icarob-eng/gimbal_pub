@@ -57,3 +57,40 @@ class LCDM(CosmologyModel):
     def w(self, a): return -1
 
     def de_density_eq(self, a): return 1
+
+
+class wCDM(CosmologyModel):
+    r"""Extension of :math:`\Lambda CDM` for any Equation of State parameter."""
+    def __init__(self, h, omega_m0, w, **kwargs):
+        super().__init__(h, omega_m0, **kwargs)
+        self._w = w
+
+    def __str__(self) -> str: return f'{self.__class__.__name__}({self.h}, {self.omega_m0}, {self._w})'
+
+    def w(self, a): return self._w
+
+    def de_density_eq(self, a):
+        return a ** (-3 * (1 + self._w))
+
+
+class CPL(CosmologyModel):
+    r"""
+    CPL cosmology parametrization.
+
+    :param omega_m0: initial matter density parâmeter, :math:`\Omega_{m0}` (using :math:`\Omega_k=0`)
+    :param w0: CPL w0 parameter
+    :param wa: CPL wa parameter
+    """
+    def __init__(self, h, omega_m0, w0, wa, **kwargs):
+        super().__init__(h, omega_m0, **kwargs)
+        self.w0 = w0
+        self.wa = wa
+
+    def __str__(self) -> str: return f'{self.__class__.__name__}({self.h}, {self.omega_m0}, {self.w0}, {self.wa})'
+
+    def w(self, a):
+        r""".. math:: w = w_0 + w_a (1 - a)"""
+        return self.w0 + self.wa * (1 - a)
+
+    def de_density_eq(self, a):
+        return a ** (-3 * (1 + self.w0 + self.wa)) * np.exp(-3 * self.wa * (1 - a))

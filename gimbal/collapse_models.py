@@ -74,15 +74,86 @@ class CollapseModel(abc.ABC):
         return np.interp(a, self.vec_a, self.vec_a * self.vec_d_delta_m / self.vec_delta_m)
 
     def gamma(self, a):
-        """:math:`\gamma(a)` function. Do not confound with the best fit of :math:`\gamma`."""
+        r""":math:`\gamma(a)` function. Do not confound with the best fit of :math:`\gamma`."""
         return np.log(self.f(a)) / np.log(self.cosmology.omega_m(a))
 
     def fsigma8(self, a, gamma: float, sigma8: float):
+        r""".. math:: f(z)\sigma_8(z) = \Omega_m(z)^\gamma \cdot \sigma_8(z=0) \cdot \exp[\int_1^a \Omega_m(z)^\gamma / a]"""
         f_fit = lambda a_: self.cosmology.omega_m(a_) ** gamma
 
-        return sigma8 * f_fit(a) * np.exp(
+        return f_fit(a) * sigma8 * np.exp(
             sc.integrate.quad(lambda a_: f_fit(a_)/a_, 1, a)[0]
         )
+
+
+class SDE(CollapseModel):
+    """Spherical Collapse Model with Smooth Dark Energy"""
+    @property
+    def s_i(self):
+        return [self.delta_m_i, self.d_delta_m_i]
+
+    def ds_da(self, s, a):
+        c = self.cosmology
+        delta_m, d_delta_m = s
+        return [
+            d_delta_m,  # (delta_m)'
+            -(2 - (1 + 3 * c.w(a) * c.omega_de(a)) / 2) * d_delta_m / a + 3 / 2 * c.omega_m(a) / a ** 2 * delta_m  # (d_delta_m)'
+        ]
+
+    def compute_equation(self):
+        sol = self._solve_diff_eq()
+
+        self.vec_delta_m = sol.T[0]
+        self.vec_d_delta_m = sol.T[1]
+
+
+class CDE(CollapseModel):
+    """Spherical Collapse Model with Clustering Dark Energy and negligible sound speed.
+
+    :param delta_de_i: initial dark energy perturbation size
+    :param q_i: initial physical sound speed divergence parameter size
+    """
+    def __init__(self, *args, delta_de_i=None, q_i=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.q_i = - self.a_i**2 * self.d_delta_m_i if q_i is None else q_i
+        self.delta_de_i = self.delta_m_to_delta_de(self.delta_m_i, self.a_i) if delta_de_i is None else delta_de_i
+
+        self.vec_delta_de = None
+
+    @property
+    def s_i(self):
+        return [self.delta_m_i, self.delta_de_i, self.q_i]
+
+    def ds_da(self, s, a):
+        c = self.cosmology
+        delta_m, delta_de, q = s
+        return [
+            -q/a**2,   # (delta_m)'
+            3 * c.w(a)/a * delta_de - (1+c.w(a)) * q/a**2,  # (delta_de)'
+            1/2 * ((1 + 3 * c.w(a) * c.omega_de(a)) * q / a
+                   - 3 * (c.omega_m(a) * delta_m + c.omega_de(a) * delta_de))  # q'
+        ]
+
+    def compute_equation(self):
+        sol = self._solve_diff_eq()
+
+        self.vec_delta_m = sol.T[0]
+        self.vec_delta_de = sol.T[1]
+        self.vec_d_delta_m = - sol.T[2] / self.vec_a ** 2
+
+    def delta_m_to_delta_de(self, delta_m, a):
+        r""".. math:: \delta_{de}=(1+w)/(1-3w) * \delta_m
+        in a EdS approximation."""
+        c = self.cosmology
+        return (1+c.w(a)) / (1-3*c.w(a)) * delta_m
+
+    def delta_ratio(self, z):
+        r"""Linear Interpolation of :math:`\delta_{de}/\delta_m` at given `z`. If equation not computed,
+        will raise exception."""
+        if self.vec_a is None or self.vec_delta_m is None or self.vec_delta_de is None:
+            self.compute_equation()
+        return np.interp(z, 1/self.vec_a - 1, self.vec_delta_de/self.vec_delta_m)
 
 
 class GeffCollapse(CollapseModel, abc.ABC):
@@ -109,6 +180,28 @@ class GeffCollapse(CollapseModel, abc.ABC):
 
         self.vec_delta_m = sol.T[0]
         self.vec_d_delta_m = sol.T[1]
+
+
+class Gg0g1g2(GeffCollapse):
+    def __init__(self, cosmology: csm.CosmologyModel, g0: float, g1: float, g2: float, **kwargs):
+        super().__init__(cosmology, **kwargs)
+        self.g0 = g0
+        self.g1 = g1
+        self.g2 = g2
+
+    def Geff(self, a):
+        return self.g0 + self.g1 * (a-1) + 1/2*self.g2 * (a-1)**2
+
+
+class Gg0g2(GeffCollapse):
+    def __init__(self, cosmology: csm.CosmologyModel, g0: float, g2: float, **kwargs):
+        super().__init__(cosmology, **kwargs)
+        self.g0 = g0
+        self.g2 = g2
+
+    def Geff(self, a):
+        return self.g0 + 1/2*self.g2 * (a-1)**2
+
 
 class Gg2(GeffCollapse):
     def __init__(self, cosmology: csm.CosmologyModel, g2: float, **kwargs):

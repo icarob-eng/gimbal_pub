@@ -1,53 +1,44 @@
-# GIMBAL: Growth Index Modeling with Background as LambdaCDM
+# GIMBAL: Growth Index Modeling for Bayesian ALgorithms
 
-This library has an Object-Oriented modeling of the Friedmann equation with a flat
-Friedmann-Lemaitre-Robertson-Walker metric as used in the paper [Phys. Rev. D 113, 043541](https://doi.org/10.1103/gcc3-5k9d) ([arXiv:2510.15054](https://arxiv.org/abs/2510.15054)). The current version counts only with a LCDM
-background, but in the future we will publish more cosmological backgrounds.
+This library is an Object-Oriented modeling of the Friedmann equation with a flat
+Friedmann-Lemaitre-Robertson-Walker metric as used in the papers 
+[Phys. Rev. D 112, 043532](https://doi.org/10.1103/71jl-gmrn) ([arXiv:2411.00963](https://arxiv.org/abs/2411.00963)), 
+[Phys. Rev. D 113, 043541](https://doi.org/10.1103/gcc3-5k9d) ([arXiv:2510.15054](https://arxiv.org/abs/2510.15054)).
 
-The library has an implementation of two collapse models with the LCDM background, both with
-the option of a modified effective gravitational constant, $G_\text{eff}$. The first one
-is a phenomenological parametrization with the free parameter `g2`:
-```python
-class Gg2(GeffCollapse):
-    def __init__(self, cosmology: csm.CosmologyModel, g2: float, **kwargs):
-        super().__init__(cosmology, **kwargs)
-        self.g2 = g2
+This library counts with some classes of cosmological backgrounds:
+- $\Lambda$CDM: `LCDM(h, omega_m0)`;
+- $w$CDM: `wCDM(h, omega_m0, w)`;
+- $w_0w_a$CDM: `CPL(h, omega_m0, w0, wa)`;
 
-    def Geff(self, a):
-        return 1 + self.g2 * ((a-1)**2 - 1)/2
-```
+And some growth of linear structure models:
+- Smooth Dark Energy (see [arXiv:2411.00963](https://arxiv.org/abs/2411.00963) for details): `SDE(cosmology)`;
+- Clustering Dark Energy (see [arXiv:2411.00963](https://arxiv.org/abs/2411.00963) for details): `CDE(cosmology)`
+- $\mu$ parametrization of $G_\text{eff}(a)$ coupled with dark energy (see
+[arXiv:2510.15054](https://arxiv.org/abs/2510.15054) for details): `GDE(cosmology, mu0)`;
+- Some variations of the Taylor series expansion of $G_\text{eff}(a)$ (see
+[arXiv:2510.15054](https://arxiv.org/abs/2510.15054) for details), like `Gg2(cosmology, g2)`;
 
-The second one is labeled in the code as GDE, as it associates $G_\text{eff}$ with the
-Dark Energy (DE) density parameter, with the free parameter `mu0`:
-```python
-class GDE(GeffCollapse):
-    r"""Modified gravity model with :math:`G_{eff}=1 + \mu_0 \Omega_{de}(a)/\Omega_\Lambda`"""
-    def __init__(self, cosmology: csm.CosmologyModel, mu0: float, **kwargs):
-        super().__init__(cosmology, **kwargs)
-        self.mu0 = mu0
 
-    def Geff(self, a):
-        return 1 + self.mu0 * self.cosmology.omega_de(a) / self.cosmology.omega_de(1)
-```
-
-The effective gravitational constant is used to compute the system of first order differential
+The effective gravitational constant $G_\text{eff}(a)$, when altered, is used to compute the system of first order differential
 equations for a matter density contrast $\delta_m$ in the abstract class `collapse_models.CollapseModel`,
-with class defined default initial conditions. It is then possible to access the values of
+with class defined default initial conditions.
+
+It is then possible to access the values of
 $\delta_m(a)$ and $\delta_m^\prime(a)$ for a class defined interval of the scale factor $a$.
 
-The `CollapseModel` class also defines the method
-```python
-def f(self, a):
-    r"""Returns interpolated :math:`f\equiv a \delta'/\delta`"""
-```
+The `CollapseModel` class also defines the methods
+- `f(a)`: a interpolation of $f(a)\equiv a \delta'/\delta$;
+- `gamma(a)`: $\gamma(a)$ (not the bestfit for constant $\gamma$, see bellow);
+- `fsigma8(a, gamma: float, sigma8: float):`: $f(z)\sigma_8(z) = \Omega_m(z)^\gamma \cdot \sigma_8(z=0) \cdot \exp[\int_1^a \Omega_m(z)^\gamma / a]$
 
-Which is used to interpolate values of $f$. Finally, to compute $\gamma$ we pass a `CollapseModel`
+Finally, to compute $\gamma$ we pass a `CollapseModel`
 to the function
 ```python
 def get_best_gamma(collapse_model: clm.CollapseModel, *_) -> list[float]:
     """
     Compute Gamma by minimizing chi2 distribution. The minimization is done via the roots of the derivative of the
-    spline of the curve of the chi2 distribution.
+    spline of the curve of the chi2 distribution. Should not differ from `get_best_gamma_optimized()`, but it's a ~25% slower, and
+    it's more numerically stable.
 
     :param collapse_model: instance of `CollapseModel` child class
 
@@ -57,4 +48,4 @@ def get_best_gamma(collapse_model: clm.CollapseModel, *_) -> list[float]:
 ```
 As shown, it returns the best value of $\gamma$ and it's residuals.
 
-Examples of the use of the models in this library are included in the notebook `examples/models.ipybn`.
+Examples of the use of some of the models in this library are included in the notebook `examples/models.ipybn`.
